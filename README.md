@@ -3,7 +3,7 @@
 A modern, space-themed snake game with stunning visual effects, AI opponents, and cross-platform support. Navigate through the cosmos as a glowing space worm, collect cosmic energy, and avoid other space creatures in this immersive HTML5 canvas game.
 
 **⚠️ Important**
-The game is available for browsers for now
+The game is available for Pc's browsers for now
 
 For mobile its available but with some glitches
 Im fixing it be patient
