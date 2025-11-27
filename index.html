@@ -2,15 +2,21 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>ChronoWorm - BY Red4</title>
     <style>
         body { 
             margin: 0; 
+            padding: 0;
             overflow: hidden; 
             background: #000; 
             font-family: 'Segoe UI', sans-serif; 
             touch-action: none;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
         }
         canvas { 
             display: block; 
@@ -45,7 +51,7 @@
             border-radius: 15px;
             border: 2px solid #00e5ff;
             color: white;
-            z-index: 10;
+            z-index: 100;
             box-shadow: 0 0 30px rgba(0, 229, 255, 0.5);
         }
         
@@ -128,11 +134,11 @@
         
         /* Mobile Controls */
         #mobileControls {
-            position: absolute;
+            position: fixed;
             bottom: 30px;
             left: 30px;
+            z-index: 50;
             display: none;
-            z-index: 5;
         }
         
         #joystick {
@@ -143,6 +149,7 @@
             border: 2px solid #00e5ff;
             position: relative;
             box-shadow: 0 0 20px rgba(0, 229, 255, 0.5);
+            touch-action: none;
         }
         
         #joystickHandle {
@@ -155,10 +162,11 @@
             left: 50%;
             transform: translate(-50%, -50%);
             box-shadow: 0 0 15px rgba(0, 229, 255, 0.7);
+            transition: transform 0.1s ease;
         }
         
         #boostButton {
-            position: absolute;
+            position: fixed;
             bottom: 30px;
             right: 30px;
             width: 80px;
@@ -174,20 +182,28 @@
             font-size: 14px;
             text-align: center;
             box-shadow: 0 0 15px rgba(255, 50, 50, 0.5);
-            z-index: 5;
+            z-index: 50;
             user-select: none;
+            touch-action: none;
+            transition: all 0.1s ease;
         }
         
         #boostButton.active {
             background: rgba(255, 100, 100, 0.9);
             box-shadow: 0 0 25px rgba(255, 100, 100, 0.8);
+            transform: scale(1.1);
         }
         
         /* Mobile detection */
-        @media (max-width: 768px) {
+        @media (max-width: 768px), (pointer: coarse) {
             #mobileControls, #boostButton {
-                display: block;
+                display: flex;
             }
+        }
+
+        /* Prevent text selection on mobile */
+        * {
+            -webkit-tap-highlight-color: transparent;
         }
     </style>
 </head>
@@ -812,7 +828,8 @@
         gameLoopId = requestAnimationFrame(loop);
     }
 
-    // Mobile Controls Functions
+    // ==================== FIXED MOBILE CONTROLS ====================
+
     function updateJoystickPosition(x, y) {
         const rect = joystick.getBoundingClientRect();
         const centerX = rect.left + rect.width / 2;
@@ -820,13 +837,18 @@
         
         const dx = x - centerX;
         const dy = y - centerY;
-        joystickDistance = Math.min(Math.sqrt(dx * dx + dy * dy), rect.width / 2);
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        const maxDistance = rect.width / 2;
+        
+        joystickDistance = Math.min(distance, maxDistance);
         joystickAngle = Math.atan2(dy, dx);
         
+        // Calculate normalized position for handle (0 to 1)
+        const normalizedX = (dx / maxDistance) * 0.7; // Limit to 70% of joystick radius
+        const normalizedY = (dy / maxDistance) * 0.7;
+        
         // Update joystick handle position
-        const handleX = (dx / (rect.width / 2)) * (rect.width / 3);
-        const handleY = (dy / (rect.height / 2)) * (rect.height / 3);
-        joystickHandle.style.transform = `translate(${handleX}px, ${handleY}px)`;
+        joystickHandle.style.transform = `translate(calc(-50% + ${normalizedX * (rect.width / 2)}px), calc(-50% + ${normalizedY * (rect.height / 2)}px))`;
     }
 
     function resetJoystick() {
@@ -836,33 +858,49 @@
     }
 
     // Touch event handlers for mobile controls
+    function handleJoystickStart(x, y) {
+        joystickActive = true;
+        updateJoystickPosition(x, y);
+    }
+
+    function handleJoystickMove(x, y) {
+        if (joystickActive) {
+            updateJoystickPosition(x, y);
+        }
+    }
+
+    function handleJoystickEnd() {
+        if (joystickActive) {
+            resetJoystick();
+        }
+    }
+
+    // Set up event listeners for joystick
     joystick.addEventListener('touchstart', (e) => {
         e.preventDefault();
-        joystickActive = true;
-        updateJoystickPosition(e.touches[0].clientX, e.touches[0].clientY);
+        e.stopPropagation();
+        handleJoystickStart(e.touches[0].clientX, e.touches[0].clientY);
     });
 
     document.addEventListener('touchmove', (e) => {
         if (joystickActive) {
             e.preventDefault();
-            updateJoystickPosition(e.touches[0].clientX, e.touches[0].clientY);
+            handleJoystickMove(e.touches[0].clientX, e.touches[0].clientY);
         }
-    });
+    }, { passive: false });
 
     document.addEventListener('touchend', (e) => {
-        if (joystickActive) {
-            resetJoystick();
-        }
-        // Check if boost button touch ended
-        if (boostActive) {
-            boostActive = false;
-            boostButton.classList.remove('active');
-        }
+        handleJoystickEnd();
+    });
+
+    document.addEventListener('touchcancel', (e) => {
+        handleJoystickEnd();
     });
 
     // Boost button touch events
     boostButton.addEventListener('touchstart', (e) => {
         e.preventDefault();
+        e.stopPropagation();
         boostActive = true;
         boostButton.classList.add('active');
     });
@@ -873,37 +911,44 @@
         boostButton.classList.remove('active');
     });
 
+    boostButton.addEventListener('touchcancel', (e) => {
+        boostActive = false;
+        boostButton.classList.remove('active');
+    });
+
     // Mouse events for testing on desktop
     joystick.addEventListener('mousedown', (e) => {
-        joystickActive = true;
-        updateJoystickPosition(e.clientX, e.clientY);
+        e.preventDefault();
+        handleJoystickStart(e.clientX, e.clientY);
     });
 
     document.addEventListener('mousemove', (e) => {
-        if (joystickActive) {
-            updateJoystickPosition(e.clientX, e.clientY);
-        }
+        handleJoystickMove(e.clientX, e.clientY);
     });
 
     document.addEventListener('mouseup', (e) => {
-        if (joystickActive) {
-            resetJoystick();
-        }
-        if (boostActive) {
-            boostActive = false;
-            boostButton.classList.remove('active');
-        }
+        handleJoystickEnd();
     });
 
     boostButton.addEventListener('mousedown', (e) => {
+        e.preventDefault();
         boostActive = true;
         boostButton.classList.add('active');
     });
 
     boostButton.addEventListener('mouseup', (e) => {
+        e.preventDefault();
         boostActive = false;
         boostButton.classList.remove('active');
     });
+
+    // Prevent context menu on long press
+    document.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        return false;
+    });
+
+    // ==================== END MOBILE CONTROLS ====================
 
     window.addEventListener('resize', () => {
         SCREEN_W = window.innerWidth;
@@ -914,10 +959,12 @@
         starsCanvas.height = SCREEN_H;
         initStars();
     });
+    
     window.addEventListener('mousemove', e => {
         mouse.x = e.clientX;
         mouse.y = e.clientY;
     });
+    
     window.addEventListener('mousedown', () => mouseDown = true);
     window.addEventListener('mouseup', () => mouseDown = false);
     
