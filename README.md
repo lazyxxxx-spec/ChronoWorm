@@ -26,10 +26,8 @@ A modern, space-themed snake game with stunning visual effects, AI opponents, an
   - `kill.mp3` - Eliminating AI opponents
 
 ### 📱 Cross-Platform Support
-- **Desktop Controls**: Mouse movement + click for boost
-- **Mobile Controls**: Virtual joystick + boost button
-- **Responsive Design**: Adapts to any screen size
-- **Touch Optimized**: Smooth touch controls for mobile devices
+
+**There is some glitches will be fixed soon**
 
 ## 🚀 How to Play
 
