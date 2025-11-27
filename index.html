@@ -1,0 +1,952 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ChronoWorm - BY Red4</title>
+    <style>
+        body { 
+            margin: 0; 
+            overflow: hidden; 
+            background: #000; 
+            font-family: 'Segoe UI', sans-serif; 
+            touch-action: none;
+        }
+        canvas { 
+            display: block; 
+            background: #000;
+        }
+        
+        #ui {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: white;
+            font-size: 20px;
+            font-weight: bold;
+            pointer-events: none;
+            text-shadow: 0 0 10px #00e5ff, 0 0 20px #00e5ff;
+            z-index: 2;
+            background: rgba(0, 20, 40, 0.7);
+            padding: 10px 20px;
+            border-radius: 10px;
+            border: 1px solid #00e5ff;
+        }
+
+        #gameOverScreen, #pauseScreen, #startScreen {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            background: rgba(0, 10, 30, 0.9);
+            padding: 40px;
+            border-radius: 15px;
+            border: 2px solid #00e5ff;
+            color: white;
+            z-index: 10;
+            box-shadow: 0 0 30px rgba(0, 229, 255, 0.5);
+        }
+        
+        /* Start screen specifics */
+        #startScreen {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            border: 2px solid #00c853;
+            padding: 50px 80px;
+            background: rgba(0, 20, 40, 0.95);
+        }
+        #usernameInput {
+            padding: 10px;
+            font-size: 18px;
+            border-radius: 5px;
+            border: 1px solid #00e5ff;
+            width: 250px;
+            text-align: center;
+            background: rgba(0, 30, 60, 0.8);
+            color: white;
+        }
+        
+        /* Button style reused for Start/Resume */
+        button {
+            background: linear-gradient(to bottom, #00c853, #009624);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 20px;
+            cursor: pointer;
+            border-radius: 5px;
+            margin-top: 10px;
+            text-shadow: 0 0 5px rgba(0, 0, 0, 0.5);
+            box-shadow: 0 0 10px rgba(0, 200, 83, 0.5);
+            transition: all 0.3s;
+        }
+        button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 15px rgba(0, 200, 83, 0.8);
+        }
+        
+        /* Style for the START button */
+        #startGameButton {
+            background: linear-gradient(to bottom, #00c853, #009624);
+        }
+        #startGameButton:hover {
+             background: linear-gradient(to bottom, #00e863, #00b834);
+        }
+        
+        #pauseScreen {
+            border: 2px solid #44aaff;
+            padding: 50px 80px;
+            background: rgba(0, 20, 40, 0.95);
+        }
+        
+        #sound-warning {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            color: #555;
+            font-size: 12px;
+        }
+        
+        h1 {
+            color: #00e5ff;
+            text-shadow: 0 0 10px #00e5ff;
+            margin-bottom: 20px;
+        }
+        
+        /* Stars background */
+        #stars {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+        }
+        
+        /* Mobile Controls */
+        #mobileControls {
+            position: absolute;
+            bottom: 30px;
+            left: 30px;
+            display: none;
+            z-index: 5;
+        }
+        
+        #joystick {
+            width: 120px;
+            height: 120px;
+            background: rgba(0, 30, 60, 0.7);
+            border-radius: 50%;
+            border: 2px solid #00e5ff;
+            position: relative;
+            box-shadow: 0 0 20px rgba(0, 229, 255, 0.5);
+        }
+        
+        #joystickHandle {
+            width: 50px;
+            height: 50px;
+            background: rgba(0, 229, 255, 0.8);
+            border-radius: 50%;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 0 15px rgba(0, 229, 255, 0.7);
+        }
+        
+        #boostButton {
+            position: absolute;
+            bottom: 30px;
+            right: 30px;
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: rgba(255, 50, 50, 0.7);
+            border: 2px solid #ff4444;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 14px;
+            text-align: center;
+            box-shadow: 0 0 15px rgba(255, 50, 50, 0.5);
+            z-index: 5;
+            user-select: none;
+        }
+        
+        #boostButton.active {
+            background: rgba(255, 100, 100, 0.9);
+            box-shadow: 0 0 25px rgba(255, 100, 100, 0.8);
+        }
+        
+        /* Mobile detection */
+        @media (max-width: 768px) {
+            #mobileControls, #boostButton {
+                display: block;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<!-- Stars background -->
+<canvas id="stars"></canvas>
+
+<div id="ui">Score: <span id="scoreVal">0</span> | AI Bots: <span id="botVal">0</span></div>
+
+<div id="startScreen">
+    <h1>ChronoWorm</h1>
+    <label for="usernameInput" style="font-size: 18px; color: #00e5ff;">Enter your name:</label>
+    <input type="text" id="usernameInput" maxlength="12" placeholder="Your Name">
+    <button id="startGameButton" onclick="startGame()">Start Game</button>
+</div>
+<div id="gameOverScreen">
+    <h1 style="margin:0 0 10px 0;">GAME OVER</h1>
+    <p id="deathReason" style="color:#aaa;">You crashed into a worm!</p>
+    <h2>Final Score: <span id="finalScore">0</span></h2>
+    <button onclick="resetGame()">Play Again</button>
+</div>
+
+<div id="pauseScreen">
+    <h1 style="margin:0 0 10px 0; color: #44aaff;">PAUSED</h1>
+    <p style="font-size: 18px;">Press 'P' or 'Escape' to resume.</p>
+    <button onclick="togglePause()">Resume Game</button>
+</div>
+
+<!-- Mobile Controls -->
+<div id="mobileControls">
+    <div id="joystick">
+        <div id="joystickHandle"></div>
+    </div>
+</div>
+<div id="boostButton">BOOST</div>
+
+<div id="sound-warning">Note: Sounds require user interaction (click) to start working.</div>
+
+<canvas id="gameCanvas"></canvas>
+
+<script>
+    const canvas = document.getElementById('gameCanvas');
+    const starsCanvas = document.getElementById('stars');
+    const starsCtx = starsCanvas.getContext('2d');
+    const ctx = canvas.getContext('2d');
+    
+    // UI Elements
+    const scoreSpan = document.getElementById('scoreVal');
+    const botSpan = document.getElementById('botVal');
+    const gameOverScreen = document.getElementById('gameOverScreen');
+    const pauseScreen = document.getElementById('pauseScreen');
+    const startScreen = document.getElementById('startScreen');
+    const usernameInput = document.getElementById('usernameInput');
+    const finalScoreSpan = document.getElementById('finalScore');
+    const deathReasonSpan = document.getElementById('deathReason');
+
+    // Mobile Controls Elements
+    const joystick = document.getElementById('joystick');
+    const joystickHandle = document.getElementById('joystickHandle');
+    const boostButton = document.getElementById('boostButton');
+    
+    // --- SOUND MANAGER ---
+    const sounds = {
+        eat:   new Audio('eat.mp3'),
+        die:   new Audio('die.mp3'),
+        boost: new Audio('boost.mp3'),
+        kill:  new Audio('kill.mp3')
+    };
+
+    function playSound(name) {
+        const s = sounds[name];
+        if (s) {
+            if (name !== 'boost') {
+                s.currentTime = 0; 
+                s.play().catch(e => {}); 
+            } else {
+                s.play().catch(e => {});
+            }
+        }
+    }
+    sounds.boost.loop = true; 
+    sounds.boost.volume = 0.5;
+
+    // --- Game Config & State ---
+    let SCREEN_W = window.innerWidth;
+    let SCREEN_H = window.innerHeight;
+    const WORLD_SIZE = 3000;
+    const MAX_FOOD = 500;
+    const BOT_COUNT = 50;
+    const BASE_SPEED = 3;
+    const BOOST_SPEED = 6;
+    const TURN_SPEED = 0.08; 
+
+    // NEW USERNAME STATE
+    let userName = "Player"; 
+    // END NEW USERNAME STATE
+
+    let isPaused = false; 
+    let isGameOver = false;
+    let gameLoopId;
+    let starsLoopId;
+    let mouse = { x: SCREEN_W / 2, y: SCREEN_H / 2 };
+    let mouseDown = false;
+
+    // Mobile control state
+    let joystickActive = false;
+    let joystickAngle = 0;
+    let joystickDistance = 0;
+    let boostActive = false;
+
+    let player;
+    let bots = [];
+    let foods = [];
+    
+    // Stars for background
+    let stars = [];
+
+    // --- START GAME FUNCTION ---
+    function startGame() {
+        // Grab username, defaulting if empty
+        const inputName = usernameInput.value.trim();
+        userName = inputName || "Anonymous";
+
+        // Hide start screen and initialize game objects
+        startScreen.style.display = 'none';
+        init();
+    }
+    // --- END START GAME FUNCTION ---
+
+    // --- Initialization ---
+    function init() {
+        player = createSnake(WORLD_SIZE/2, WORLD_SIZE/2, true);
+        bots = [];
+        for(let i=0; i<BOT_COUNT; i++) bots.push(spawnBot());
+        foods = [];
+        spawnFood(MAX_FOOD);
+        
+        // Initialize stars
+        initStars();
+        
+        isGameOver = false;
+        isPaused = false;
+        gameOverScreen.style.display = 'none';
+        pauseScreen.style.display = 'none';
+        
+        sounds.boost.pause();
+        sounds.boost.currentTime = 0;
+
+        if(gameLoopId) cancelAnimationFrame(gameLoopId);
+        if(starsLoopId) cancelAnimationFrame(starsLoopId);
+        loop();
+        starsLoop();
+    }
+
+    function createSnake(x, y, isPlayer = false) {
+        let s = {
+            x: x, y: y,
+            angle: Math.random() * Math.PI * 2,
+            targetAngle: 0,
+            radius: 12,
+            speed: BASE_SPEED,
+            segments: [],
+            length: 10, 
+            isPlayer: isPlayer,
+            alive: true,
+            boosting: false,
+            // For animated skin
+            skinOffset: 0,
+            skinPattern: isPlayer ? 'nebula' : 'galaxy'
+        };
+        for(let i=0; i<s.length; i++) s.segments.push({ x: x, y: y });
+        return s;
+    }
+
+    function spawnBot() {
+        let bot = createSnake(
+            Math.random() * WORLD_SIZE, 
+            Math.random() * WORLD_SIZE
+        );
+        // Assign random skin pattern to bots
+        const patterns = ['galaxy', 'stars', 'comet'];
+        bot.skinPattern = patterns[Math.floor(Math.random() * patterns.length)];
+        return bot;
+    }
+
+    function togglePause() {
+        if (isGameOver) return;
+        
+        isPaused = !isPaused;
+
+        if (isPaused) {
+            pauseScreen.style.display = 'block';
+            sounds.boost.pause();
+        } else {
+            pauseScreen.style.display = 'none';
+        }
+    }
+
+    function update() {
+        if (isGameOver || isPaused) {
+            return;
+        }
+
+        updateSnake(player);
+        checkCollisions(player);
+
+        if (player.boosting && player.length > 5) {
+            if (sounds.boost.paused) {
+                sounds.boost.play().catch(e=>{});
+            }
+        } else {
+            sounds.boost.pause();
+            sounds.boost.currentTime = 0;
+        }
+
+        bots.forEach(bot => {
+            if (Math.random() < 0.05) bot.targetAngle = bot.angle + (Math.random() - 0.5) * 2;
+            if (bot.x < 100) bot.targetAngle = 0;
+            if (bot.x > WORLD_SIZE - 100) bot.targetAngle = Math.PI;
+            if (bot.y < 100) bot.targetAngle = Math.PI / 2;
+            if (bot.y > WORLD_SIZE - 100) bot.targetAngle = -Math.PI / 2;
+            
+            bot.boosting = (Math.random() < 0.01) ? true : (Math.random() < 0.05 ? false : bot.boosting);
+            
+            let diff = bot.targetAngle - bot.angle;
+            while (diff < -Math.PI) diff += Math.PI * 2;
+            while (diff > Math.PI) diff -= Math.PI * 2;
+            bot.angle += diff * 0.1;
+
+            updateSnake(bot);
+        });
+
+        if (foods.length < MAX_FOOD) spawnFood(5);
+
+        scoreSpan.innerText = Math.floor((player.length - 10) * 10);
+        botSpan.innerText = bots.length;
+    }
+
+    function updateSnake(snake) {
+        if (!snake.alive) return;
+
+        if (snake.isPlayer) {
+            // Handle mobile controls
+            if (joystickActive && joystickDistance > 5) {
+                snake.targetAngle = joystickAngle;
+                snake.boosting = boostActive;
+            } else {
+                // Desktop controls
+                const dx = mouse.x - SCREEN_W / 2;
+                const dy = mouse.y - SCREEN_H / 2;
+                snake.targetAngle = Math.atan2(dy, dx);
+                snake.boosting = mouseDown;
+            }
+
+            let diff = snake.targetAngle - snake.angle;
+            while (diff < -Math.PI) diff += Math.PI * 2;
+            while (diff > Math.PI) diff -= Math.PI * 2;
+            snake.angle += diff * TURN_SPEED;
+        }
+
+        let currentSpeed = snake.boosting && snake.length > 5 ? BOOST_SPEED : BASE_SPEED;
+        
+        snake.x += Math.cos(snake.angle) * currentSpeed;
+        snake.y += Math.sin(snake.angle) * currentSpeed;
+
+        updateSegment(snake.segments[0], snake.x, snake.y, snake.radius);
+        for (let i = 1; i < snake.segments.length; i++) {
+            updateSegment(snake.segments[i], snake.segments[i-1].x, snake.segments[i-1].y, snake.radius);
+        }
+
+        while(snake.segments.length < snake.length) {
+            let last = snake.segments[snake.segments.length - 1];
+            snake.segments.push({ x: last.x, y: last.y });
+        }
+
+        if (snake.boosting && snake.length > 5 && Math.random() < 0.1) {
+             snake.length--;
+             snake.segments.pop();
+             foods.push({
+                 x: snake.segments[snake.segments.length-1].x,
+                 y: snake.segments[snake.segments.length-1].y,
+                 radius: 8,
+                 color: getSnakeColor(snake, 0)
+             });
+        }
+
+        for (let i = foods.length - 1; i >= 0; i--) {
+            const f = foods[i];
+            const dist = Math.hypot(snake.x - f.x, snake.y - f.y);
+            if (dist < snake.radius + f.radius) {
+                snake.length += (f.radius / 5);
+                foods.splice(i, 1);
+                
+                if (snake.isPlayer) {
+                    playSound('eat');
+                }
+            }
+        }
+        
+        // Update skin animation
+        snake.skinOffset += 0.1;
+    }
+
+    function updateSegment(segment, targetX, targetY, radius) {
+        const reach = radius * 0.4;
+        const dx = targetX - segment.x;
+        const dy = targetY - segment.y;
+        const dist = Math.hypot(dx, dy);
+        if (dist > reach) {
+            const angle = Math.atan2(dy, dx);
+            const moveDist = dist - reach;
+            segment.x += Math.cos(angle) * moveDist;
+            segment.y += Math.sin(angle) * moveDist;
+        }
+    }
+
+    function checkCollisions(snake) {
+        if (snake.x < snake.radius || snake.x > WORLD_SIZE - snake.radius || 
+            snake.y < snake.radius || snake.y > WORLD_SIZE - snake.radius) {
+            die("You hit the edge of space!");
+            return;
+        }
+
+        for(let i = 10; i < snake.segments.length; i++) {
+            const seg = snake.segments[i];
+            const dist = Math.hypot(snake.x - seg.x, snake.y - seg.y);
+            if (dist < snake.radius) {
+                die("You collided with yourself!");
+                return;
+            }
+        }
+
+        for(let i=0; i<bots.length; i++) {
+            let bot = bots[i];
+            
+            for(let s=0; s<bot.segments.length; s+=2) {
+                const seg = bot.segments[s];
+                const dist = Math.hypot(snake.x - seg.x, snake.y - seg.y);
+                if (dist < snake.radius + snake.radius) {
+                    die("You crashed into a space worm!");
+                    return;
+                }
+            }
+
+            for(let p=0; p<snake.segments.length; p+=2) {
+                const seg = snake.segments[p];
+                const dist = Math.hypot(bot.x - seg.x, bot.y - seg.y);
+                if(dist < bot.radius + snake.radius) {
+                    playSound('kill');
+                    killBot(i);
+                    break;
+                }
+            }
+        }
+    }
+
+    function killBot(index) {
+        let bot = bots[index];
+        for(let s of bot.segments) {
+            if(Math.random() < 0.5) { 
+                foods.push({
+                    x: s.x, y: s.y,
+                    radius: 8 + Math.random() * 5,
+                    color: getSnakeColor(bot, 0)
+                });
+            }
+        }
+        bots.splice(index, 1);
+        bots.push(spawnBot());
+    }
+
+    function die(reason) {
+        isGameOver = true;
+        
+        pauseScreen.style.display = 'none';
+
+        playSound('die');
+        sounds.boost.pause();
+        
+        deathReasonSpan.innerText = reason;
+        finalScoreSpan.innerText = Math.floor((player.length - 10) * 10);
+        gameOverScreen.style.display = 'block';
+    }
+
+    function spawnFood(amount) {
+        for(let i=0; i<amount; i++) {
+            foods.push({
+                x: Math.random() * WORLD_SIZE,
+                y: Math.random() * WORLD_SIZE,
+                radius: 4 + Math.random() * 6,
+                color: getFoodColor()
+            });
+        }
+    }
+
+    function getFoodColor() {
+        const colors = [
+            '#ff4444', '#44ff44', '#4444ff', 
+            '#ffff44', '#ff44ff', '#44ffff',
+            '#ff8844', '#8844ff', '#44ff88'
+        ];
+        return colors[Math.floor(Math.random() * colors.length)];
+    }
+
+    function getSnakeColor(snake, segmentIndex) {
+        // Create animated colorful patterns based on skin type
+        const t = (snake.skinOffset + segmentIndex * 0.2) % 1;
+        
+        switch(snake.skinPattern) {
+            case 'nebula':
+                // Nebula pattern - purple/blue/pink shifting
+                const r = Math.floor(150 + 105 * Math.sin(t * Math.PI * 2));
+                const g = Math.floor(50 + 50 * Math.sin(t * Math.PI * 2 + Math.PI/3));
+                const b = Math.floor(200 + 55 * Math.sin(t * Math.PI * 2 + 2*Math.PI/3));
+                return `rgb(${r}, ${g}, ${b})`;
+                
+            case 'galaxy':
+                // Galaxy pattern - blue/green shifting
+                const r2 = Math.floor(50 + 50 * Math.sin(t * Math.PI * 2));
+                const g2 = Math.floor(100 + 100 * Math.sin(t * Math.PI * 2 + Math.PI/3));
+                const b2 = Math.floor(200 + 55 * Math.sin(t * Math.PI * 2 + 2*Math.PI/3));
+                return `rgb(${r2}, ${g2}, ${b2})`;
+                
+            case 'stars':
+                // Stars pattern - white/yellow with sparkles
+                if (Math.sin(t * Math.PI * 10) > 0.7) {
+                    return `rgb(255, 255, ${150 + 105 * Math.sin(t * Math.PI * 2)})`;
+                } else {
+                    return `rgb(${150 + 105 * Math.sin(t * Math.PI * 2)}, ${150 + 105 * Math.sin(t * Math.PI * 2)}, 255)`;
+                }
+                
+            case 'comet':
+                // Comet pattern - orange/red with tail effect
+                const intensity = 0.5 + 0.5 * Math.sin(t * Math.PI * 2);
+                return `rgb(${200 + 55 * intensity}, ${100 + 155 * intensity}, ${50 * intensity})`;
+                
+            default:
+                return '#ffffff';
+        }
+    }
+
+    function drawSnake(snake) {
+        if(Math.abs(snake.x - player.x) > SCREEN_W && Math.abs(snake.y - player.y) > SCREEN_H) return;
+        
+        // Draw snake body with animated skin
+        for (let i = snake.segments.length - 1; i >= 0; i--) {
+            const s = snake.segments[i];
+            ctx.beginPath();
+            ctx.arc(s.x, s.y, snake.radius, 0, Math.PI * 2);
+            
+            // Create gradient for glowing effect
+            const gradient = ctx.createRadialGradient(
+                s.x, s.y, 0,
+                s.x, s.y, snake.radius * 1.5
+            );
+            
+            const color = getSnakeColor(snake, i);
+            gradient.addColorStop(0, color);
+            gradient.addColorStop(0.7, color);
+            gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+            
+            ctx.fillStyle = gradient;
+            ctx.fill();
+            
+            // Add glow effect
+            ctx.shadowColor = color;
+            ctx.shadowBlur = 15;
+            ctx.fill();
+            ctx.shadowBlur = 0;
+        }
+
+        // Draw Player Name
+        if (snake.isPlayer) {
+            ctx.fillStyle = '#00e5ff';
+            ctx.font = 'bold 20px Arial';
+            ctx.textAlign = 'center';
+            ctx.shadowColor = '#00e5ff';
+            ctx.shadowBlur = 10;
+            ctx.fillText(userName, snake.x, snake.y - 25);
+            ctx.shadowBlur = 0;
+        }
+        
+        // Draw eyes
+        ctx.fillStyle = 'white';
+        let ex = snake.x + Math.cos(snake.angle - 0.5) * snake.radius/2;
+        let ey = snake.y + Math.sin(snake.angle - 0.5) * snake.radius/2;
+        ctx.beginPath(); 
+        ctx.arc(ex, ey, 4, 0, Math.PI*2); 
+        ctx.fill();
+        
+        ex = snake.x + Math.cos(snake.angle + 0.5) * snake.radius/2;
+        ey = snake.y + Math.sin(snake.angle + 0.5) * snake.radius/2;
+        ctx.beginPath(); 
+        ctx.arc(ex, ey, 4, 0, Math.PI*2); 
+        ctx.fill();
+        
+        // Draw bot label
+        if(!snake.isPlayer) {
+            ctx.fillStyle = "rgba(255,255,255,0.7)";
+            ctx.font = "10px Arial";
+            ctx.fillText("Space Worm", snake.x - 25, snake.y - 20);
+        }
+    }
+
+    function draw() {
+        // Clear with dark space background
+        ctx.fillStyle = '#000011';
+        ctx.fillRect(0, 0, SCREEN_W, SCREEN_H);
+
+        ctx.save();
+        ctx.translate(SCREEN_W/2 - player.x, SCREEN_H/2 - player.y);
+
+        // Draw space border with glow
+        ctx.strokeStyle = '#00e5ff';
+        ctx.lineWidth = 20;
+        ctx.shadowColor = '#00e5ff';
+        ctx.shadowBlur = 20;
+        ctx.strokeRect(0, 0, WORLD_SIZE, WORLD_SIZE);
+        ctx.shadowBlur = 0;
+        
+        drawGrid();
+
+        // Draw food as glowing orbs
+        for(let f of foods) {
+            if(Math.abs(f.x - player.x) < SCREEN_W && Math.abs(f.y - player.y) < SCREEN_H) {
+                ctx.beginPath();
+                ctx.arc(f.x, f.y, f.radius, 0, Math.PI*2);
+                
+                // Create glowing effect for food
+                const gradient = ctx.createRadialGradient(
+                    f.x, f.y, 0,
+                    f.x, f.y, f.radius * 2
+                );
+                gradient.addColorStop(0, f.color);
+                gradient.addColorStop(0.7, f.color);
+                gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+                
+                ctx.fillStyle = gradient;
+                ctx.shadowColor = f.color;
+                ctx.shadowBlur = 15;
+                ctx.fill();
+                ctx.shadowBlur = 0;
+            }
+        }
+
+        bots.forEach(bot => drawSnake(bot));
+        if (!isGameOver) drawSnake(player);
+
+        ctx.restore();
+    }
+
+    function drawGrid() {
+        ctx.strokeStyle = '#1a2a4a';
+        ctx.lineWidth = 1;
+        const gridSize = 100;
+        let startX = Math.max(0, Math.floor((player.x - SCREEN_W/2)/gridSize)*gridSize);
+        let endX = Math.min(WORLD_SIZE, startX + SCREEN_W + gridSize*2);
+        let startY = Math.max(0, Math.floor((player.y - SCREEN_H/2)/gridSize)*gridSize);
+        let endY = Math.min(WORLD_SIZE, startY + SCREEN_H + gridSize*2);
+
+        ctx.beginPath();
+        for (let x = startX; x <= endX; x += gridSize) {
+            ctx.moveTo(x, startY); ctx.lineTo(x, endY);
+        }
+        for (let y = startY; y <= endY; y += gridSize) {
+            ctx.moveTo(startX, y); ctx.lineTo(endX, y);
+        }
+        ctx.stroke();
+    }
+
+    function initStars() {
+        stars = [];
+        for (let i = 0; i < 200; i++) {
+            stars.push({
+                x: Math.random() * SCREEN_W,
+                y: Math.random() * SCREEN_H,
+                size: Math.random() * 2 + 0.5,
+                speed: Math.random() * 0.5 + 0.1,
+                brightness: Math.random() * 0.5 + 0.5
+            });
+        }
+    }
+
+    function drawStars() {
+        starsCtx.fillStyle = '#000011';
+        starsCtx.fillRect(0, 0, SCREEN_W, SCREEN_H);
+        
+        starsCtx.fillStyle = 'white';
+        for (let star of stars) {
+            starsCtx.globalAlpha = star.brightness;
+            starsCtx.beginPath();
+            starsCtx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
+            starsCtx.fill();
+            
+            // Move stars for parallax effect
+            star.x -= star.speed;
+            if (star.x < 0) {
+                star.x = SCREEN_W;
+                star.y = Math.random() * SCREEN_H;
+            }
+        }
+        starsCtx.globalAlpha = 1;
+    }
+
+    function starsLoop() {
+        drawStars();
+        starsLoopId = requestAnimationFrame(starsLoop);
+    }
+
+    function resetGame() {
+        sounds.die.pause();
+        sounds.die.currentTime = 0;
+        // After game over, show the start screen again to enter a new name
+        gameOverScreen.style.display = 'none';
+        startScreen.style.display = 'flex';
+    }
+
+    function loop() {
+        update();
+        draw();
+        gameLoopId = requestAnimationFrame(loop);
+    }
+
+    // Mobile Controls Functions
+    function updateJoystickPosition(x, y) {
+        const rect = joystick.getBoundingClientRect();
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
+        
+        const dx = x - centerX;
+        const dy = y - centerY;
+        joystickDistance = Math.min(Math.sqrt(dx * dx + dy * dy), rect.width / 2);
+        joystickAngle = Math.atan2(dy, dx);
+        
+        // Update joystick handle position
+        const handleX = (dx / (rect.width / 2)) * (rect.width / 3);
+        const handleY = (dy / (rect.height / 2)) * (rect.height / 3);
+        joystickHandle.style.transform = `translate(${handleX}px, ${handleY}px)`;
+    }
+
+    function resetJoystick() {
+        joystickActive = false;
+        joystickDistance = 0;
+        joystickHandle.style.transform = 'translate(-50%, -50%)';
+    }
+
+    // Touch event handlers for mobile controls
+    joystick.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        joystickActive = true;
+        updateJoystickPosition(e.touches[0].clientX, e.touches[0].clientY);
+    });
+
+    document.addEventListener('touchmove', (e) => {
+        if (joystickActive) {
+            e.preventDefault();
+            updateJoystickPosition(e.touches[0].clientX, e.touches[0].clientY);
+        }
+    });
+
+    document.addEventListener('touchend', (e) => {
+        if (joystickActive) {
+            resetJoystick();
+        }
+        // Check if boost button touch ended
+        if (boostActive) {
+            boostActive = false;
+            boostButton.classList.remove('active');
+        }
+    });
+
+    // Boost button touch events
+    boostButton.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        boostActive = true;
+        boostButton.classList.add('active');
+    });
+
+    boostButton.addEventListener('touchend', (e) => {
+        e.preventDefault();
+        boostActive = false;
+        boostButton.classList.remove('active');
+    });
+
+    // Mouse events for testing on desktop
+    joystick.addEventListener('mousedown', (e) => {
+        joystickActive = true;
+        updateJoystickPosition(e.clientX, e.clientY);
+    });
+
+    document.addEventListener('mousemove', (e) => {
+        if (joystickActive) {
+            updateJoystickPosition(e.clientX, e.clientY);
+        }
+    });
+
+    document.addEventListener('mouseup', (e) => {
+        if (joystickActive) {
+            resetJoystick();
+        }
+        if (boostActive) {
+            boostActive = false;
+            boostButton.classList.remove('active');
+        }
+    });
+
+    boostButton.addEventListener('mousedown', (e) => {
+        boostActive = true;
+        boostButton.classList.add('active');
+    });
+
+    boostButton.addEventListener('mouseup', (e) => {
+        boostActive = false;
+        boostButton.classList.remove('active');
+    });
+
+    window.addEventListener('resize', () => {
+        SCREEN_W = window.innerWidth;
+        SCREEN_H = window.innerHeight;
+        canvas.width = SCREEN_W;
+        canvas.height = SCREEN_H;
+        starsCanvas.width = SCREEN_W;
+        starsCanvas.height = SCREEN_H;
+        initStars();
+    });
+    window.addEventListener('mousemove', e => {
+        mouse.x = e.clientX;
+        mouse.y = e.clientY;
+    });
+    window.addEventListener('mousedown', () => mouseDown = true);
+    window.addEventListener('mouseup', () => mouseDown = false);
+    
+    window.addEventListener('keydown', (e) => {
+        if (e.key === 'p' || e.key === 'P' || e.key === 'Escape') {
+            // Only toggle pause if the start screen is hidden (i.e., game is running)
+            if (startScreen.style.display === 'none' && gameOverScreen.style.display === 'none') {
+                 togglePause();
+            }
+        }
+    });
+
+    // Handle Enter key for starting the game
+    usernameInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            startGame();
+        }
+    });
+    
+
+    canvas.width = SCREEN_W;
+    canvas.height = SCREEN_H;
+    starsCanvas.width = SCREEN_W;
+    starsCanvas.height = SCREEN_H;
+    
+    // Initial State: Show the start screen
+    startScreen.style.display = 'flex';
+    initStars();
+    starsLoop();
+</script>
+</body>
+</html>
